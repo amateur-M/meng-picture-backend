@@ -3,13 +3,15 @@ package com.meng.mengpicturebackend.common;
 import com.meng.mengpicturebackend.exception.ErrorCode;
 import lombok.Data;
 
+import java.io.Serializable;
+
 /**
  * @DESCRIPTION: 全局响应对象
  * @AUTHOR: MENGLINGQI
  * @TIME: 2025/2/6 23:17
  **/
 @Data
-public class BaseResponse<T> {
+public class BaseResponse<T> implements Serializable {
     private int code;
 
     private T data;
