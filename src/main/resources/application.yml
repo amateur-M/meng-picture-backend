@@ -1,0 +1,36 @@
+server:
+  port: 8111
+  servlet:
+    context-path: /api
+spring:
+  application:
+    name: meng-picture-backend
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/meng_picture?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: root
+    password: mq20010724
+
+mybatis-plus:
+  configuration:
+    # MyBatis 配置
+    map-underscore-to-camel-case: false
+    # 仅在开发环境打印日志
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      logic-delete-field: isDelete # 全局逻辑删除的实体字段名
+      logic-delete-value: 1 # 全局逻辑删除的值（默认 1）
+      logic-not-delete-value: 0 # 全局逻辑未删除的值（默认 0）
+
+knife4j:
+  enable: true
+  openapi:
+    title: 云图库接口文档
+    version: 1.0
+    group:
+      default:
+        group-name: 默认分组
+        api-rule: package
+        api-rule-resources:
+          - com.meng.mengpicturebackend.controller
