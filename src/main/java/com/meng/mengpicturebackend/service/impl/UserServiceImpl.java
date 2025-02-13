@@ -1,16 +1,22 @@
 package com.meng.mengpicturebackend.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.meng.mengpicturebackend.constant.UserConstant;
 import com.meng.mengpicturebackend.exception.BusinessException;
 import com.meng.mengpicturebackend.exception.ErrorCode;
 import com.meng.mengpicturebackend.model.entity.User;
 import com.meng.mengpicturebackend.model.enums.UserRoleEnum;
+import com.meng.mengpicturebackend.model.vo.LoginUserVO;
 import com.meng.mengpicturebackend.service.UserService;
 import com.meng.mengpicturebackend.mapper.UserMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
+
+import javax.servlet.http.HttpServletRequest;
 
 /**
 * @author MENGLINGQI
@@ -18,6 +24,7 @@ import org.springframework.util.DigestUtils;
 * @createDate 2025-02-10 22:55:30
 */
 @Service
+@Slf4j
 public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     implements UserService {
 
@@ -67,6 +74,35 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return user.getId();
     }
 
+    @Override
+    public LoginUserVO userLogin(String userAccount, String userPassword, HttpServletRequest request) {
+        // 1、校验参数
+        if (StrUtil.hasBlank(userAccount, userPassword)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数为空");
+        }
+        if (userAccount.length() < 4) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户账号过短");
+        }
+        if (userPassword.length() < 8) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "密码错误");
+        }
+        // 2、密码加密
+        String encryptPassword = getEncryptPassword(userPassword);
+        // 3、检查用户账号是否已存在
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("userAccount", userAccount);
+        queryWrapper.eq("userPassword", encryptPassword);
+        User user = this.baseMapper.selectOne(queryWrapper);
+        // 不存在，抛异常
+        if (user == null){
+            log.info("user login failed, userAccount cannot match userPassword");
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户不存在或密码错误");
+        }
+        // 4、记录用户登录态
+        request.getSession().setAttribute(UserConstant.USER_LOGIN_STATE, user);
+        return this.getLoginUserVO(user);
+    }
+
 
     /**
      * @description:  加密用户密码
@@ -81,6 +117,21 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         // 密码加密
         String encryptPassword = DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes());
         return encryptPassword;
+    }
+
+    /**
+     * @description:  获取脱敏登录用户信息
+     * * @param[1] user
+     * @throws:
+     * @return:
+     */
+    @Override
+    public LoginUserVO getLoginUserVO(User user) {
+        if (user == null)
+            return null;
+        LoginUserVO loginUserVO = new LoginUserVO();
+        BeanUtil.copyProperties(user, loginUserVO);
+        return loginUserVO;
     }
 }
 
