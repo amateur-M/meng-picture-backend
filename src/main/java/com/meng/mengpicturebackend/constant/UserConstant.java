@@ -7,6 +7,16 @@ public interface UserConstant {
      */
     String USER_LOGIN_STATE = "user_login";
 
+    /**
+     * 用户注册盐值
+     */
+    String USER_REGISTER_SALT = "meng";
+
+    /**
+     * 用户注册默认密码
+     */
+    String USER_DEFAULT_PASSWORD = "12345678";
+
     //  region 权限
 
     /**
