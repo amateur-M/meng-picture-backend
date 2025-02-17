@@ -69,7 +69,7 @@ public class UserController {
      * @return
      */
     @GetMapping("/get/loginUser")
-    public BaseResponse<LoginUserVO> userLogin(HttpServletRequest request){
+    public BaseResponse<LoginUserVO> getLoginUser(HttpServletRequest request){
         User loginUser = userService.getLoginUser(request);
         return ResultUtils.success(userService.getLoginUserVO(loginUser));
     }

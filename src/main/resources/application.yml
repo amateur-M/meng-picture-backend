@@ -34,3 +34,12 @@ knife4j:
         api-rule: package
         api-rule-resources:
           - com.meng.mengpicturebackend.controller
+
+# 对象存储配置（需要从腾讯云获取）
+cos:
+  client:
+    host:
+    secretId:
+    secretKey:
+    region:
+    bucket:
