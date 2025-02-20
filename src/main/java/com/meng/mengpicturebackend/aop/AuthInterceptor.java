@@ -18,7 +18,7 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 
 /**
- * @DESCRIPTION: description
+ * @DESCRIPTION: 注解拦截器
  * @AUTHOR: MENGLINGQI
  * @TIME: 2025/2/15 21:57
  **/
