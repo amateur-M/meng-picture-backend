@@ -213,6 +213,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return queryWrapper;
     }
 
+    @Override
+    public boolean isAdmin(User user) {
+        if (user == null)
+            return false;
+        if (!user.getUserRole().equals(UserConstant.ADMIN_ROLE))
+            return false;
+        return true;
+    }
+
 
 }
 
