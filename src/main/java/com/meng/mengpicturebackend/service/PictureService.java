@@ -2,11 +2,10 @@ package com.meng.mengpicturebackend.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.IService;
 import com.meng.mengpicturebackend.model.dto.picture.PictureQueryRequest;
 import com.meng.mengpicturebackend.model.dto.picture.PictureUploadRequest;
-import com.meng.mengpicturebackend.model.dto.user.UserQueryRequest;
 import com.meng.mengpicturebackend.model.entity.Picture;
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.meng.mengpicturebackend.model.entity.User;
 import com.meng.mengpicturebackend.model.vo.PictureVO;
 import org.springframework.web.multipart.MultipartFile;

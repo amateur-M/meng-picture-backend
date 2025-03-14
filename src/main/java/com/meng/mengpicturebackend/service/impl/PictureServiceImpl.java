@@ -178,7 +178,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
                 pictureVO.setUser(userVO);
             }
         }
-    return pictureVO;
+        return pictureVO;
     }
 
     /**
