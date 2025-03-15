@@ -11,12 +11,10 @@ import com.meng.mengpicturebackend.constant.UserConstant;
 import com.meng.mengpicturebackend.exception.BusinessException;
 import com.meng.mengpicturebackend.exception.ErrorCode;
 import com.meng.mengpicturebackend.exception.ThrowUtils;
-import com.meng.mengpicturebackend.model.dto.picture.PictureEditRequest;
-import com.meng.mengpicturebackend.model.dto.picture.PictureQueryRequest;
-import com.meng.mengpicturebackend.model.dto.picture.PictureUpdateRequest;
-import com.meng.mengpicturebackend.model.dto.picture.PictureUploadRequest;
+import com.meng.mengpicturebackend.model.dto.picture.*;
 import com.meng.mengpicturebackend.model.entity.Picture;
 import com.meng.mengpicturebackend.model.entity.User;
+import com.meng.mengpicturebackend.model.enums.PictureReviewStatusEnum;
 import com.meng.mengpicturebackend.model.vo.PictureTagCategory;
 import com.meng.mengpicturebackend.model.vo.PictureVO;
 import com.meng.mengpicturebackend.service.PictureService;
@@ -48,7 +46,6 @@ public class PictureController {
     @Resource
     private PictureService pictureService;
 
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     @PostMapping("/upload")
     public BaseResponse<PictureVO> uploadPicture(@RequestPart("file") MultipartFile multipartFile, PictureUploadRequest pictureUploadRequest, HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
@@ -92,7 +89,7 @@ public class PictureController {
      */
     @PostMapping("/update")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<Boolean> updatePicture(@RequestBody PictureUpdateRequest pictureUpdateRequest) {
+    public BaseResponse<Boolean> updatePicture(@RequestBody PictureUpdateRequest pictureUpdateRequest, HttpServletRequest request) {
         // 参数校验
         if (pictureUpdateRequest.getId() <= 0 || pictureUpdateRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -107,6 +104,9 @@ public class PictureController {
         // 判断图片是否存在
         Long oldPictureId = pictureUpdateRequest.getId();
         Picture oldPicture = pictureService.getById(oldPictureId);
+        // 补充审核参数
+        User loginUser = userService.getLoginUser(request);
+        pictureService.fillReviewParam(picture, loginUser);
         ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR, "要更新的图片不存在");
         // 操作数据库
         boolean isUpdated = pictureService.updateById(picture);
@@ -161,7 +161,7 @@ public class PictureController {
     }
 
     /**
-     * @description:  分页获取图片封装
+     * @description:  分页获取图片封装（普通用户）
      * @param[1] pictureQueryRequest
      * @throws:
      * @return:
@@ -171,6 +171,9 @@ public class PictureController {
 
         long current = pictureQueryRequest.getCurrent();
         long pageSize = pictureQueryRequest.getPageSize();
+        // 设置审核状态为通过状态，适配场景：普通用户默认只能看见审核通过内容
+        pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
+
         // 分页查询
         Page<Picture> picturePage = pictureService.page(new Page<>(current, pageSize), pictureService.getQueryWrapper(pictureQueryRequest));
         return ResultUtils.success(pictureService.getPictureVOPage(picturePage, null));
@@ -183,6 +186,7 @@ public class PictureController {
      * @throws:
      * @return:
      */
+    @PostMapping("/edit")
     public BaseResponse<Boolean> editPicture(HttpServletRequest request, @RequestBody PictureEditRequest pictureEditRequest) {
         if (pictureEditRequest == null || pictureEditRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -193,13 +197,15 @@ public class PictureController {
         picture.setTags(JSONUtil.toJsonStr(pictureEditRequest.getTags()));
         // 设置编辑时间
         picture.setEditTime(new Date());
+        User loginUser = userService.getLoginUser(request);
+        // 补充审核参数
+        pictureService.fillReviewParam(picture, loginUser);
         // 校验图片
         pictureService.validPicture(picture);
         // 判断是否存在
         Picture oldPicture = pictureService.getById(pictureEditRequest.getId());
         ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR, "图片不存在");
         // 仅本人或管理员可以编辑
-        User loginUser = userService.getLoginUser(request);
         if (!oldPicture.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser))
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "没有权限编辑");
 
@@ -209,6 +215,11 @@ public class PictureController {
         return ResultUtils.success(true);
     }
 
+    /**
+     * @description: 获取热门分类
+     * @throws:
+     * @return:
+     */
     @GetMapping("/tag_category")
     public BaseResponse<PictureTagCategory> listPictureTagCategory() {
         PictureTagCategory pictureTagCategory = new PictureTagCategory();
@@ -219,5 +230,21 @@ public class PictureController {
         return ResultUtils.success(pictureTagCategory);
     }
 
+
+    /**
+     * @description:  审核图片
+     * @param[1] request
+     * @param[2] pictureReviewRequest
+     * @throws:
+     * @return:
+     */
+    @PostMapping("/review")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> reviewPicture(HttpServletRequest request, @RequestBody PictureReviewRequest pictureReviewRequest) {
+        ThrowUtils.throwIf(pictureReviewRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        pictureService.reviewPicture(pictureReviewRequest, loginUser);
+        return ResultUtils.success(true);
+    }
 
 }
