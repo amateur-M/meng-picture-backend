@@ -55,7 +55,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
 
     /**
      * @description:  上传图片 --> 数据万象解析 --> 填充其他信息 --> 数据库入库
-     * @param[1] multipartFile
+     * @param[1] inputSource
      * @param[2] pictureUploadRequest
      * @param[3] loginUser
      * @throws:

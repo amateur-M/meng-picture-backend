@@ -46,10 +46,33 @@ public class PictureController {
     @Resource
     private PictureService pictureService;
 
+    /**
+     * @description:  上传图片
+     * @param[1] multipartFile
+     * @param[2] pictureUploadRequest
+     * @param[3] request
+     * @throws:
+     * @return:
+     */
     @PostMapping("/upload")
     public BaseResponse<PictureVO> uploadPicture(@RequestPart("file") MultipartFile multipartFile, PictureUploadRequest pictureUploadRequest, HttpServletRequest request) {
         User loginUser = userService.getLoginUser(request);
         PictureVO pictureVO = pictureService.uploadPicture(multipartFile, pictureUploadRequest, loginUser);
+        return ResultUtils.success(pictureVO);
+    }
+
+    /**
+     * @description:  通过 URL 上传图片
+     * @param[1] pictureUploadRequest
+     * @param[2] request
+     * @throws:
+     * @return:
+     */
+    @PostMapping("/upload/url")
+    public BaseResponse<PictureVO> uploadPictureByUrl(@RequestBody PictureUploadRequest pictureUploadRequest, HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        String fileUrl = pictureUploadRequest.getFileUrl();
+        PictureVO pictureVO = pictureService.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
         return ResultUtils.success(pictureVO);
     }
 
