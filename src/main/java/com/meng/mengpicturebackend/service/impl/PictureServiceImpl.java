@@ -10,7 +10,10 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.meng.mengpicturebackend.exception.BusinessException;
 import com.meng.mengpicturebackend.exception.ErrorCode;
 import com.meng.mengpicturebackend.exception.ThrowUtils;
-import com.meng.mengpicturebackend.manager.FileManager;
+import com.meng.mengpicturebackend.manager.upload.FilePictureUpload;
+import com.meng.mengpicturebackend.manager.upload.PictureUploadTemplate;
+import com.meng.mengpicturebackend.manager.upload.UrlPictureUpload;
+import com.meng.mengpicturebackend.mapper.PictureMapper;
 import com.meng.mengpicturebackend.model.dto.file.UploadPictureResult;
 import com.meng.mengpicturebackend.model.dto.picture.PictureQueryRequest;
 import com.meng.mengpicturebackend.model.dto.picture.PictureReviewRequest;
@@ -21,10 +24,8 @@ import com.meng.mengpicturebackend.model.enums.PictureReviewStatusEnum;
 import com.meng.mengpicturebackend.model.vo.PictureVO;
 import com.meng.mengpicturebackend.model.vo.UserVO;
 import com.meng.mengpicturebackend.service.PictureService;
-import com.meng.mengpicturebackend.mapper.PictureMapper;
 import com.meng.mengpicturebackend.service.UserService;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
@@ -44,10 +45,13 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
     implements PictureService{
 
     @Resource
-    FileManager fileManager;
+    UserService userService;
 
     @Resource
-    UserService userService;
+    UrlPictureUpload urlPictureUpload;
+
+    @Resource
+    FilePictureUpload filePictureUpload;
 
     /**
      * @description:  上传图片 --> 数据万象解析 --> 填充其他信息 --> 数据库入库
@@ -58,7 +62,7 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
      * @return:
      */
     @Override
-    public PictureVO uploadPicture(MultipartFile multipartFile, PictureUploadRequest pictureUploadRequest, User loginUser) {
+    public PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureUploadRequest, User loginUser) {
         // 用于判断是更新还是上传
         Long pictureId = null;
         if (pictureUploadRequest != null)
@@ -79,7 +83,13 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         // 上传图片得到信息
         // 根据用户划分目录
         String filePrefix = String.format("public/%s", loginUser.getId());
-        UploadPictureResult uploadPictureResult = fileManager.uploadPicture(multipartFile, filePrefix);
+
+        // 默认本地文件上传
+        PictureUploadTemplate pictureUploadTemplate = filePictureUpload;
+        if (inputSource instanceof String)
+            pictureUploadTemplate = urlPictureUpload;
+
+        UploadPictureResult uploadPictureResult = pictureUploadTemplate.uploadPicture(inputSource, filePrefix);
         // 构造入库信息
         Picture picture = new Picture();
 
