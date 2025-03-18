@@ -7,14 +7,23 @@ spring:
     name: meng-picture-backend
   profiles:
     active: local
+  # 数据库配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/meng_picture?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
     username: root
     password: mq20010724
+  # 文件上传配置
   servlet:
     multipart:
       max-file-size: 10MB
+  # Redis 配置
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    password:
+    timeout: 5000
+    database: 0
 mybatis-plus:
   configuration:
     # MyBatis 配置

@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.meng.mengpicturebackend.model.dto.picture.PictureQueryRequest;
 import com.meng.mengpicturebackend.model.dto.picture.PictureReviewRequest;
+import com.meng.mengpicturebackend.model.dto.picture.PictureUploadByBatchRequest;
 import com.meng.mengpicturebackend.model.dto.picture.PictureUploadRequest;
 import com.meng.mengpicturebackend.model.entity.Picture;
 import com.meng.mengpicturebackend.model.entity.User;
@@ -69,6 +70,17 @@ public interface PictureService extends IService<Picture> {
      */
     void reviewPicture(PictureReviewRequest pictureReviewRequest, User loginUser);
 
-
+    /**
+     * 填充图片审核参数
+     * @param picture
+     * @param loginUser
+     */
     void fillReviewParam(Picture picture, User loginUser);
+
+    /**
+     * 批量抓取图片上传
+     * @param pictureUploadByBatchRequest
+     * @param loginUser
+     */
+    Integer uploadPictureByBatch(PictureUploadByBatchRequest pictureUploadByBatchRequest, User loginUser);
 }

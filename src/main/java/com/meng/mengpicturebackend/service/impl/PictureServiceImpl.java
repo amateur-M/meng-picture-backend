@@ -5,6 +5,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.meng.mengpicturebackend.exception.BusinessException;
@@ -17,6 +18,7 @@ import com.meng.mengpicturebackend.mapper.PictureMapper;
 import com.meng.mengpicturebackend.model.dto.file.UploadPictureResult;
 import com.meng.mengpicturebackend.model.dto.picture.PictureQueryRequest;
 import com.meng.mengpicturebackend.model.dto.picture.PictureReviewRequest;
+import com.meng.mengpicturebackend.model.dto.picture.PictureUploadByBatchRequest;
 import com.meng.mengpicturebackend.model.dto.picture.PictureUploadRequest;
 import com.meng.mengpicturebackend.model.entity.Picture;
 import com.meng.mengpicturebackend.model.entity.User;
@@ -25,10 +27,16 @@ import com.meng.mengpicturebackend.model.vo.PictureVO;
 import com.meng.mengpicturebackend.model.vo.UserVO;
 import com.meng.mengpicturebackend.service.PictureService;
 import com.meng.mengpicturebackend.service.UserService;
+import lombok.extern.slf4j.Slf4j;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.io.IOException;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +48,7 @@ import java.util.stream.Collectors;
 * @description 针对表【picture(图片)】的数据库操作Service实现
 * @createDate 2025-02-18 14:17:38
 */
+@Slf4j
 @Service
 public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
     implements PictureService{
@@ -94,7 +103,11 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         Picture picture = new Picture();
 
         picture.setUrl(uploadPictureResult.getUrl());
-        picture.setName(uploadPictureResult.getPicName());
+        // 默认从解析的url中获取，支持自定义
+        String picName = uploadPictureResult.getPicName();
+        if (pictureUploadRequest != null && StrUtil.isNotBlank(pictureUploadRequest.getPicName()))
+            picName = pictureUploadRequest.getPicName();
+        picture.setName(picName);
         picture.setPicSize(uploadPictureResult.getPicSize());
         picture.setPicWidth(uploadPictureResult.getPicWidth());
         picture.setPicHeight(uploadPictureResult.getPicHeight());
@@ -287,7 +300,76 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         }
     }
 
+    /**
+     * @description:  批量抓取图片上传
+     * @param[1] pictureUploadByBatchRequest
+     * @param[2] loginUser
+     * @throws:
+     * @return:
+     */
+    @Override
+    public Integer uploadPictureByBatch(PictureUploadByBatchRequest pictureUploadByBatchRequest, User loginUser) {
+        // 校验参数
+        ThrowUtils.throwIf(pictureUploadByBatchRequest == null, ErrorCode.PARAMS_ERROR, "参数为空");
+        String searchText = pictureUploadByBatchRequest.getSearchText();
+        Integer count = pictureUploadByBatchRequest.getCount();
+        String namePrefix = pictureUploadByBatchRequest.getNamePrefix();
+        ThrowUtils.throwIf(count > 30, ErrorCode.PARAMS_ERROR, "最多30条");
 
+        // 名称前缀默认等于搜索词
+        if (StringUtils.isBlank(namePrefix))
+            namePrefix = searchText;
+        // 抓取内容
+        String fetchUrl = String.format("https://cn.bing.com/images/async?q=%s&mmasync=1", searchText);
+        Document document;
+        try {
+            document = Jsoup.connect(fetchUrl).get();
+        } catch (IOException e) {
+            log.error("获取页面失败", e);
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "获取页面失败");
+        }
+        Element div = document.getElementsByClass("dgControl").first();
+        if (ObjUtil.isNull(div)) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "获取元素失败");
+        }
+        Elements imgElementList = div.select("img.mimg");
+
+        // 记录上传成功图片数
+        int uploadCount = 0;
+
+        for (Element imgElement : imgElementList) {
+            String fileUrl = imgElement.attr("src");
+            if (StringUtils.isBlank(fileUrl)) {
+                log.info("图片地址为空，已跳过: {}", fileUrl);
+                continue;
+            }
+
+            // 处理图片上传地址，防止转义问题
+            int questionMarkIndex = fileUrl.indexOf("?");
+            if (questionMarkIndex != -1) {
+                fileUrl = fileUrl.substring(0, questionMarkIndex);
+            }
+            // 上传图片
+            PictureUploadRequest pictureUploadRequest = new PictureUploadRequest();
+            pictureUploadRequest.setFileUrl(fileUrl);
+            // 构造图片名称
+            pictureUploadRequest.setPicName(namePrefix + (uploadCount + 1));
+            try {
+
+                PictureVO pictureVO = this.uploadPicture(fileUrl, pictureUploadRequest, loginUser);
+                log.info("图片上传成功: {}", pictureVO.getId());
+                uploadCount++;
+            } catch (Exception e) {
+                log.error("图片上传失败", e);
+                continue;
+            }
+
+            if (uploadCount >= count) {
+                break;
+            }
+        }
+        return uploadCount;
+    }
 }
 
 

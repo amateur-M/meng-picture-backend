@@ -1,8 +1,11 @@
 package com.meng.mengpicturebackend.controller;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.RandomUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.meng.mengpicturebackend.annotation.AuthCheck;
 import com.meng.mengpicturebackend.common.BaseResponse;
 import com.meng.mengpicturebackend.common.DeleteRequest;
@@ -21,6 +24,9 @@ import com.meng.mengpicturebackend.service.PictureService;
 import com.meng.mengpicturebackend.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -29,6 +35,7 @@ import javax.servlet.http.HttpServletRequest;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @DESCRIPTION: 图片相关操作接口类
@@ -45,6 +52,21 @@ public class PictureController {
 
     @Resource
     private PictureService pictureService;
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
+
+    /**
+     * caffeine 本地缓存
+     */
+    private final Cache<String, String> LOCAL_CACHE =
+            Caffeine.newBuilder().initialCapacity(1024)
+                    .maximumSize(10000L)
+                    // 缓存 5 分钟移除
+                    .expireAfterWrite(5L, TimeUnit.MINUTES)
+                    .build();
+
 
     /**
      * @description:  上传图片
@@ -190,16 +212,82 @@ public class PictureController {
      * @return:
      */
     @PostMapping("/list/page/vo")
-    public BaseResponse<Page<PictureVO>> listPictureVOByPage(@RequestBody PictureQueryRequest pictureQueryRequest) {
+    public BaseResponse<Page<PictureVO>> listPictureVOByPage(@RequestBody PictureQueryRequest pictureQueryRequest, HttpServletRequest request) {
 
         long current = pictureQueryRequest.getCurrent();
         long pageSize = pictureQueryRequest.getPageSize();
+        // 限制爬虫
+        ThrowUtils.throwIf(pageSize > 20, ErrorCode.PARAMS_ERROR, "每页条数不能超过 20");
         // 设置审核状态为通过状态，适配场景：普通用户默认只能看见审核通过内容
         pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
 
         // 分页查询
         Page<Picture> picturePage = pictureService.page(new Page<>(current, pageSize), pictureService.getQueryWrapper(pictureQueryRequest));
-        return ResultUtils.success(pictureService.getPictureVOPage(picturePage, null));
+        return ResultUtils.success(pictureService.getPictureVOPage(picturePage, request));
+    }
+
+    /**
+     * @description:  分页获取图片封装（普通用户）有缓存
+     * @param[1] pictureQueryRequest
+     * @throws:
+     * @return:
+     */
+    @PostMapping("/list/page/vo/cache")
+    public BaseResponse<Page<PictureVO>> listPictureVOByPageWithCache(@RequestBody PictureQueryRequest pictureQueryRequest, HttpServletRequest request) {
+
+        long current = pictureQueryRequest.getCurrent();
+        long pageSize = pictureQueryRequest.getPageSize();
+        // 限制爬虫
+        ThrowUtils.throwIf(pageSize > 20, ErrorCode.PARAMS_ERROR, "每页条数不能超过 20");
+
+        // 设置审核状态为通过状态，适配场景：普通用户默认只能看见审核通过内容
+        pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
+
+        // 构造 caffeine + redis 多级缓存
+        // 1.构造缓存key
+        String queryCondition = JSONUtil.toJsonStr(pictureQueryRequest);
+        String hashKey = DigestUtils.md5DigestAsHex(queryCondition.getBytes());
+        String cacheKey = String.format("mengPicture:getPictureVOByPage:%s", hashKey);
+
+        // 2. 先从caffeine中取
+        String cachedValue = LOCAL_CACHE.getIfPresent(cacheKey);
+        if (cachedValue != null) {
+            log.info("caffeine本地缓存命中：{}", cacheKey);
+            Page<PictureVO> cachedPage = JSONUtil.toBean(cachedValue, Page.class);
+            return ResultUtils.success(cachedPage);
+        } else {
+            // 3. caffeine未命中从redis中取
+            ValueOperations<String, String> opsForValue = stringRedisTemplate.opsForValue();
+            cachedValue = opsForValue.get(cacheKey);
+            if (cachedValue != null) {
+                // caffeine未命中，redis缓存命中
+                log.info("caffeine未命中，redis缓存命中:{}", cacheKey);
+                // 更新本地缓存
+                LOCAL_CACHE.put(cacheKey, cachedValue);
+                Page<PictureVO> cachedPage = JSONUtil.toBean(cachedValue, Page.class);
+                return ResultUtils.success(cachedPage);
+            } else {
+                // 4.caffeine + redis缓存均未命中
+                log.info("caffeine + redis缓存均未命中:{}", cacheKey);
+                // 分页查询数据库
+                Page<Picture> picturePage = pictureService.page(new Page<>(current, pageSize), pictureService.getQueryWrapper(pictureQueryRequest));
+                Page<PictureVO> pictureVOPage = pictureService.getPictureVOPage(picturePage, request);
+
+                // 写入redis
+                String cacheValue = JSONUtil.toJsonStr(pictureVOPage);
+                // 缓存value是否需要转换
+                // String cacheHexValue = DigestUtils.md5DigestAsHex(cacheValue.getBytes());
+
+                // 构造缓存过期时间 5 - 10 分钟 （防止缓存雪崩）
+                int expireTime = 5 * 60 + RandomUtil.randomInt(0, 300);
+                opsForValue.set(cacheKey, cacheValue, expireTime, TimeUnit.SECONDS);
+
+                // 写入本地缓存
+                LOCAL_CACHE.put(cacheKey, cacheValue);
+
+                return ResultUtils.success(pictureVOPage);
+            }
+        }
     }
 
     /**
@@ -269,5 +357,25 @@ public class PictureController {
         pictureService.reviewPicture(pictureReviewRequest, loginUser);
         return ResultUtils.success(true);
     }
+
+    /**
+     * @description: 批量上传图片
+     * @param[1] pictureUploadByBatchRequest
+     * @param[2] request
+     * @throws:
+     * @return:
+     */
+    @PostMapping("/upload/batch")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Integer> uploadPictureByBatch(
+            @RequestBody PictureUploadByBatchRequest pictureUploadByBatchRequest,
+            HttpServletRequest request
+    ) {
+        ThrowUtils.throwIf(pictureUploadByBatchRequest == null, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        int uploadCount = pictureService.uploadPictureByBatch(pictureUploadByBatchRequest, loginUser);
+        return ResultUtils.success(uploadCount);
+    }
+
 
 }
