@@ -1,5 +1,6 @@
 package com.meng.mengpicturebackend.manager;
 
+import cn.hutool.core.io.FileUtil;
 import com.meng.mengpicturebackend.config.CosClientConfig;
 import com.qcloud.cos.COSClient;
 import com.qcloud.cos.model.COSObject;
@@ -10,6 +11,8 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @DESCRIPTION: COS通用能力类
@@ -53,14 +56,24 @@ public class CosManager {
      * @param file 文件
      */
     public PutObjectResult putPictureObject(String key, File file) {
+        // 上传请求对象
         PutObjectRequest putObjectRequest = new PutObjectRequest(cosClientConfig.getBucket(), key, file);
 
-        // 对图片进行处理（获取图片基本信息）
+        // 图片压缩 转为 webp 格式
+        String webpKey = FileUtil.mainName(key) + ".webp";
+        // 构造图片处理规则
+        List<PicOperations.Rule> ruleList = new ArrayList<>();
+        PicOperations.Rule compressRule = new PicOperations.Rule();
+        compressRule.setRule("imageMogr2/format/webp");
+        compressRule.setBucket(cosClientConfig.getBucket());
+        compressRule.setFileId(webpKey);
+        ruleList.add(compressRule);
+
         // 定义图片处理操作对象
         PicOperations picOperations = new PicOperations();
         // 1 表示返回原图片所有信息
         picOperations.setIsPicInfo(1);
-        // 设置图片处理规则
+        picOperations.setRules(ruleList);
         putObjectRequest.setPicOperations(picOperations);
         return cosClient.putObject(putObjectRequest);
     }
