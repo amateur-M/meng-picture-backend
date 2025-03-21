@@ -111,7 +111,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         // 不存在，抛异常
         if (user == null){
             log.info("user login failed, userAccount cannot match userPassword");
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户不存在或密码错误");
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户名或密码错误");
         }
         // 4、记录用户登录态
         request.getSession().setAttribute(UserConstant.USER_LOGIN_STATE, user);
@@ -121,7 +121,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     /**
      * @description:  加密用户密码
-     * * @param[1] userPassword
+     * @param[1] userPassword
      * @throws:
      * @return:
      */
@@ -149,7 +149,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     /**
      * @description:  获取脱敏登录用户信息
-     * * @param[1] user
+     * @param[1] user
      * @throws:
      * @return:
      */

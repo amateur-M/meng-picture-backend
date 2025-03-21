@@ -66,8 +66,15 @@ public abstract class PictureUploadTemplate {
             List<CIObject> objectList = processResults.getObjectList();
             if (CollUtil.isNotEmpty(objectList)) {
                 CIObject compressCiObject = objectList.get(0);
+
+                // 缩略图默认等于压缩后图片
+                CIObject thumnailCiObject = compressCiObject;
+                if (objectList.size() > 1){
+                    // 有缩略图才取
+                    thumnailCiObject = objectList.get(1);
+                }
                 // 封装压缩图返回结果
-                return getUploadPictureResult(originalFilename, compressCiObject);
+                return getUploadPictureResult(originalFilename, compressCiObject, thumnailCiObject);
             }
             return getUploadPictureResult(originalFilename, uploadPath, file, imageInfo);
         } catch (Exception e) {
@@ -139,7 +146,7 @@ public abstract class PictureUploadTemplate {
      * @throws:
      * @return:
      */
-    private UploadPictureResult getUploadPictureResult(String originalFilename, CIObject compressCiObject) {
+    private UploadPictureResult getUploadPictureResult(String originalFilename, CIObject compressCiObject, CIObject thumnailCiObject) {
         // 计算宽高
         int picWidth = compressCiObject.getWidth();
         int picHeight = compressCiObject.getHeight();
@@ -147,7 +154,7 @@ public abstract class PictureUploadTemplate {
 
         // 封装返回结果
         UploadPictureResult uploadPictureResult = new UploadPictureResult();
-        // 图片压缩后的地址
+        // 图片压缩后的信息
         uploadPictureResult.setUrl(cosClientConfig.getHost() + "/" + compressCiObject.getKey());
         uploadPictureResult.setPicName(FileUtil.mainName(originalFilename));
         uploadPictureResult.setPicSize(compressCiObject.getSize().longValue());
@@ -155,6 +162,9 @@ public abstract class PictureUploadTemplate {
         uploadPictureResult.setPicHeight(picHeight);
         uploadPictureResult.setPicScale(picScale);
         uploadPictureResult.setPicFormat(compressCiObject.getFormat());
+
+        // 设置缩略图
+        uploadPictureResult.setThumbnailUrl(cosClientConfig.getHost() + "/" + thumnailCiObject.getKey());
 
         return uploadPictureResult;
     }
