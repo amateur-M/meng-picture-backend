@@ -122,6 +122,10 @@ public class PictureController {
 
         // 操作数据库
         boolean isRemoved = pictureService.removeById(deletePictureId);
+        // 删除COS文件（可自行选择是否清理）
+        if (isRemoved) {
+            pictureService.clearPictureFile(picture);
+        }
         ThrowUtils.throwIf(!isRemoved, ErrorCode.OPERATION_ERROR, "删除失败");
         return ResultUtils.success(true);
     }

@@ -11,6 +11,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.meng.mengpicturebackend.exception.BusinessException;
 import com.meng.mengpicturebackend.exception.ErrorCode;
 import com.meng.mengpicturebackend.exception.ThrowUtils;
+import com.meng.mengpicturebackend.manager.CosManager;
 import com.meng.mengpicturebackend.manager.upload.FilePictureUpload;
 import com.meng.mengpicturebackend.manager.upload.PictureUploadTemplate;
 import com.meng.mengpicturebackend.manager.upload.UrlPictureUpload;
@@ -32,6 +33,7 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -62,6 +64,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
     @Resource
     FilePictureUpload filePictureUpload;
 
+    @Resource
+    CosManager cosManager;
+
     /**
      * @description:  上传图片 --> 数据万象解析 --> 填充其他信息 --> 数据库入库
      * @param[1] inputSource
@@ -88,6 +93,12 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
 
             // boolean exists = this.lambdaQuery().eq(Picture::getId, pictureId).exists();
             // ThrowUtils.throwIf(!exists, ErrorCode.NOT_FOUND_ERROR, "图片不存在");
+
+            // 清理COS文件（可自行选择是否清理）
+            cosManager.delObject(oldPicture.getUrl());
+            if (StrUtil.isNotBlank(oldPicture.getThumbnailUrl())) {
+                cosManager.delObject(oldPicture.getThumbnailUrl());
+            }
         }
         // 上传图片得到信息
         // 根据用户划分目录
@@ -370,6 +381,31 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             }
         }
         return uploadCount;
+    }
+
+    /**
+     * @description:  删除图片
+     * @param[1] picture
+     * @throws:
+     * @return:
+     */
+    @Async
+    @Override
+    public void clearPictureFile(Picture oldPicture) {
+        String oldPictureUrl = oldPicture.getUrl();
+        // 判断该图片是否被多条记录引用
+        long count = this.lambdaQuery().eq(Picture::getUrl, oldPictureUrl).count();
+        if (count > 1){
+            log.info("图片被多条记录引用，不删除");
+            return;
+        }
+        // 删除图片
+        cosManager.delObject(oldPictureUrl);
+
+        // 删除缩略图
+        String oldPictureThumbnailUrl = oldPicture.getThumbnailUrl();
+        if (StringUtils.isNotBlank(oldPictureThumbnailUrl))
+            cosManager.delObject(oldPictureThumbnailUrl);
     }
 }
 

@@ -3,6 +3,7 @@ package com.meng.mengpicturebackend.manager;
 import cn.hutool.core.io.FileUtil;
 import com.meng.mengpicturebackend.config.CosClientConfig;
 import com.qcloud.cos.COSClient;
+import com.qcloud.cos.exception.CosClientException;
 import com.qcloud.cos.model.COSObject;
 import com.qcloud.cos.model.PutObjectRequest;
 import com.qcloud.cos.model.PutObjectResult;
@@ -88,6 +89,15 @@ public class CosManager {
         picOperations.setRules(ruleList);
         putObjectRequest.setPicOperations(picOperations);
         return cosClient.putObject(putObjectRequest);
+    }
+
+    /**
+     * 删除对象
+     *
+     * @param key  唯一键
+     */
+    public void delObject(String key) throws CosClientException {
+        cosClient.deleteObject(cosClientConfig.getBucket(), key);
     }
 
 }
