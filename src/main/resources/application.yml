@@ -2,6 +2,11 @@ server:
   port: 8111
   servlet:
     context-path: /api
+    # session配置
+    session:
+      # cookie 30 天过期
+      cookie:
+        max-age: 2592000
 spring:
   application:
     name: meng-picture-backend
@@ -24,6 +29,10 @@ spring:
     password:
     timeout: 5000
     database: 0
+  # session 30 天过期
+  session:
+    store-type: redis
+    timeout: 2592000
 mybatis-plus:
   configuration:
     # MyBatis 配置
